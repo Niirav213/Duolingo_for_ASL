@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: asl_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-asluser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-aslpass123}
+      POSTGRES_DB: ${DB_NAME:-asl_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-asluser}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - asl_network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: asl_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - asl_network
+
+  # Backend FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: asl_backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-asluser}:${DB_PASSWORD:-aslpass123}@postgres:5432/${DB_NAME:-asl_db}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      ML_SERVICE_URL: http://ml-service:8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - asl_network
+
+  # ML Service
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: asl_ml_service
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./ml-service:/app
+      - ml_models:/app/app/models
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    networks:
+      - asl_network
+
+  # Frontend Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: asl_frontend
+    ports:
+      - "80:80"
+      - "3000:3000"
+    depends_on:
+      - backend
+      - ml-service
+    networks:
+      - asl_network
+
+  # Celery Worker (Optional)
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: asl_celery_worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-asluser}:${DB_PASSWORD:-aslpass123}@postgres:5432/${DB_NAME:-asl_db}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A app.tasks worker --loglevel=info
+    networks:
+      - asl_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  ml_models:
+
+networks:
+  asl_network:
+    driver: bridge
