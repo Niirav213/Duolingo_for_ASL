@@ -1,0 +1,63 @@
+{
+  "A": {
+    "hints": {
+      "thumb_ip": "Rest your thumb against the side of your curled fingers.",
+      "index_mcp": "Curl all four fingers into a fist.",
+      "index_pip": "Keep your fingers tightly curled."
+    },
+    "position_hint": "Hold the sign at chest level in neutral space.",
+    "orientation_hint": "Your palm should face sideways (toward your dominant side)."
+  },
+  "B": {
+    "hints": {
+      "thumb_ip": "Tuck your thumb across your palm.",
+      "index_pip": "Keep all four fingers straight and together.",
+      "pinky_pip": "Keep all fingers fully extended upward."
+    },
+    "position_hint": "Hold fingers upright near your shoulder.",
+    "orientation_hint": "Palm should face outward (away from you)."
+  },
+  "C": {
+    "hints": {
+      "index_mcp": "Curve your fingers into a C shape.",
+      "thumb_ip": "Curve your thumb to mirror your fingers."
+    },
+    "orientation_hint": "Palm faces sideways, forming a C opening."
+  },
+  "D": {
+    "hints": {
+      "index_pip": "Keep your index finger fully extended and pointing up.",
+      "middle_pip": "Curl your middle, ring, and pinky fingers down.",
+      "thumb_ip": "Touch your thumb to your curled fingers."
+    }
+  },
+  "E": {
+    "hints": {
+      "index_pip": "Bend all fingers down at the middle joint.",
+      "thumb_ip": "Tuck your thumb under your bent fingers."
+    },
+    "orientation_hint": "Palm faces outward."
+  },
+  "F": {
+    "hints": {
+      "index_pip": "Touch your index finger to your thumb tip.",
+      "middle_pip": "Keep middle, ring, and pinky fingers extended."
+    }
+  },
+  "L": {
+    "hints": {
+      "thumb_ip": "Extend your thumb fully upward.",
+      "index_pip": "Extend your index finger fully forward.",
+      "middle_pip": "Curl your middle, ring, and pinky fingers down."
+    },
+    "orientation_hint": "Form an L shape with thumb up, index finger pointing forward."
+  },
+  "Y": {
+    "hints": {
+      "thumb_ip": "Extend your thumb fully outward.",
+      "pinky_pip": "Extend your pinky finger fully.",
+      "index_pip": "Curl your index, middle, and ring fingers down."
+    },
+    "orientation_hint": "Palm faces you, with thumb and pinky extended."
+  }
+}

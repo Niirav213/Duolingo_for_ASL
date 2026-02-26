@@ -1,0 +1,34 @@
+# Model weights — use Git LFS or Hugging Face Hub instead
+models/checkpoints/*.pt
+models/checkpoints/*.pth
+
+# Raw training data — too large for git
+data/datasets/raw/
+data/datasets/*.npy
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.env
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Keep these empty folders tracked
+!models/checkpoints/.gitkeep
+!data/datasets/.gitkeep
