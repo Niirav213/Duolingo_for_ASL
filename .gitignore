@@ -1,6 +1,25 @@
+# Virtual environments
 mp_env/
 venv/
+.venv/
+
+# Python cache
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
 .ipynb_checkpoints/
+
+# The entire dataset folder
+asl-cv-module/data/datasets/raw_images/
+asl-cv-module/data/datasets/raw/
+asl-cv-module/data/datasets/*.npy
