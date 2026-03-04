@@ -78,7 +78,7 @@ def preprocess(val_size: float = 0.2, random_seed: int = 42):
     y = encoder.fit_transform(y_labels)
 
     # Save label mapping
-    label_map = {int(i): label for i, label in enumerate(encoder.classes_)}
+    label_map = {int(i): str(label) for i, label in enumerate(encoder.classes_)}
     with open(OUT_DIR / "label_map.json", "w") as f:
         json.dump(label_map, f, indent=2)
     print(f"[Preprocess] Label map saved: {label_map}")
