@@ -20,8 +20,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 # Import our DetectionResult and Landmark from detector
-from detector import DetectionResult, Landmark
-
+from core.detector import DetectionResult, Landmark
 
 # ─────────────────────────────────────────────
 # Output Data Structure
@@ -394,7 +393,7 @@ class ASLFeatureExtractor:
 
 if __name__ == "__main__":
     import cv2
-    from detector import ASLDetector
+    from core.detector import ASLDetector
 
     print("Starting extractor test... Press 'q' to quit.\n")
 
