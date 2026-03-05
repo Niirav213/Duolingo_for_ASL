@@ -1,6 +1,6 @@
 import base64
 
-image_path = r"C:\Users\ASUS\Downloads\download.jpg"  # your image file name
+image_path = r"C:\Users\ASUS\Downloads\asl_alphabet_test\asl_alphabet_test\A_test.jpg"  # your image file name
 
 with open(image_path, "rb") as f:
     encoded = base64.b64encode(f.read()).decode('utf-8')

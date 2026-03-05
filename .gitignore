@@ -23,3 +23,34 @@ Thumbs.db
 asl-cv-module/data/datasets/raw_images/
 asl-cv-module/data/datasets/raw/
 asl-cv-module/data/datasets/*.npy
+
+
+# Test scripts (optional - only if you don't want them in repo)
+test_api.py
+test_image.py
+encode_img.py
+debug_test.py
+
+# Test images
+*.jpg
+*.jpeg
+*.png
+*.bmp
+```
+
+---
+
+### How to add them
+
+Just open your `.gitignore` file in VSCode and add the lines at the bottom. Then save with **Ctrl+S**.
+
+---
+
+### But think about which ones you actually want to ignore
+```
+test_api.py      → useful for teammates to test, KEEP it in git ✅
+debug_test.py    → development only, ignore it ❌
+encode_img.py    → one-off script, ignore it ❌
+download.jpg     → test image, ignore it ❌
+*.jpg / *.png    → careful with this — it ignores ALL images
+                   including any you might want to keep

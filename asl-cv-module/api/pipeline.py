@@ -13,6 +13,8 @@ import base64
 import numpy as np
 import torch
 from pathlib import Path
+import json
+import pickle
 
 from core.detector import ASLDetector
 from core.extractor import ASLFeatureExtractor
@@ -24,7 +26,7 @@ from api.schemas import AnalyzeFrameResponse, JointScores
 
 # ── Model registry — edit to swap models ──
 MODEL_REGISTRY = {
-    "static": "models/checkpoints/static_sign.pt",
+    "static": "models/checkpoints/static_sign_best.pt",
     "dynamic": "models/checkpoints/dynamic_sign.pt",
 }
 
@@ -37,11 +39,11 @@ class ASLPipeline:
     """
 
     def __init__(
-        self,
-        load_static: bool = True,
-        load_dynamic: bool = True,
-        static_labels: list[str] = None,
-        dynamic_labels: list[str] = None,
+    self,
+    load_static: bool = True,
+    load_dynamic: bool = True,
+    static_labels: list[str] = None,
+    dynamic_labels: list[str] = None,
     ):
         print("[ASLPipeline] Initializing...")
 
@@ -51,20 +53,32 @@ class ASLPipeline:
         self.scorer = ASLScorer()
         self.feedback_gen = FeedbackGenerator()
 
-        # ── Static classifier (A-Z letters) ──
+        # ── Load label map from file ──
+        import json
+        from pathlib import Path
+        label_map_path = Path("data/datasets/label_map.json")
+        if label_map_path.exists():
+            with open(label_map_path) as f:
+                label_map = json.load(f)
+            loaded_labels = [label_map[str(i)] for i in range(len(label_map))]
+        else:
+            loaded_labels = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+        # ── Static classifier ──
         self.static_classifier = None
         if load_static:
+            labels_to_use = static_labels or loaded_labels
             self.static_classifier = StaticSignClassifier(
-                num_classes=26,
-                labels=static_labels or list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+                num_classes=len(labels_to_use),
+                labels=labels_to_use,
             )
             static_path = MODEL_REGISTRY["static"]
             if Path(static_path).exists():
                 self.static_classifier.load(static_path)
             else:
-                print(f"[ASLPipeline] WARNING: No static checkpoint found at {static_path}. Using untrained model.")
+                print(f"[ASLPipeline] WARNING: No static checkpoint found at {static_path}.")
 
-        # ── Dynamic classifier (word-level signs) ──
+        # ── Dynamic classifier ──
         self.dynamic_classifier = None
         if load_dynamic:
             self.dynamic_classifier = DynamicSignClassifier(
@@ -76,8 +90,15 @@ class ASLPipeline:
             if Path(dynamic_path).exists():
                 self.dynamic_classifier.load(dynamic_path)
             else:
-                print(f"[ASLPipeline] WARNING: No dynamic checkpoint found at {dynamic_path}. Using untrained model.")
-
+                print(f"[ASLPipeline] WARNING: No dynamic checkpoint found at {dynamic_path}.")
+        #scalar loading
+        
+        scaler_path = Path("data/datasets/scaler.pkl")
+        if scaler_path.exists():
+            with open(scaler_path, "rb") as f:
+                self.scaler = pickle.load(f)
+        else:
+            self.scaler = None
         print("[ASLPipeline] Ready.")
 
     def analyze_frame(
@@ -101,6 +122,7 @@ class ASLPipeline:
         """
         # ── 1. Decode frame ──
         frame = self._decode_frame(frame_base64)
+        frame = cv2.flip(frame, 1)
 
         # ── 2. Detect landmarks ──
         detection = self.detector.process_frame(frame)
@@ -113,10 +135,16 @@ class ASLPipeline:
 
         # ── 4. Classify sign ──
         detected_sign, confidence = "", 0.0
+
+        # Apply scaler if available
+        vector = features.vector
+        if self.scaler is not None:
+            vector = self.scaler.transform(vector.reshape(1, -1))[0].astype(np.float32)
+
         if mode == "static" and self.static_classifier:
-            detected_sign, confidence = self.static_classifier.predict(features.vector)
+            detected_sign, confidence = self.static_classifier.predict(vector)
         elif mode == "dynamic" and self.dynamic_classifier:
-            detected_sign, confidence = self.dynamic_classifier.predict(features.vector)
+            detected_sign, confidence = self.dynamic_classifier.predict(vector)
 
         # ── 5. Score against target ──
         score_result = self.scorer.score(features, target_sign)

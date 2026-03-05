@@ -168,10 +168,15 @@ class StaticSignClassifier(BaseSignClassifier):
 
         optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=1e-4)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.5)
-        criterion = nn.CrossEntropyLoss()
+        
 
         X_t = torch.FloatTensor(X_train).to(self.device)
         y_t = torch.LongTensor(y_train).to(self.device)
+        # Compute class weights to handle any remaining imbalance
+        class_counts = torch.bincount(y_t)
+        class_weights = 1.0 / class_counts.float()
+        class_weights = class_weights / class_weights.sum()
+        criterion = nn.CrossEntropyLoss(weight=class_weights.to(self.device))
 
         best_val_acc = 0.0
 
