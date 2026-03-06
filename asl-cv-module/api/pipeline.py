@@ -97,6 +97,7 @@ class ASLPipeline:
         if scaler_path.exists():
             with open(scaler_path, "rb") as f:
                 self.scaler = pickle.load(f)
+            print("[ASLpipeline] Scalar found")
         else:
             self.scaler = None
         print("[ASLPipeline] Ready.")
@@ -138,8 +139,10 @@ class ASLPipeline:
 
         # Apply scaler if available
         vector = features.vector
+        print(f"[DEBUG] Before scale: mean={vector.mean():.3f} std={vector.std():.3f}")
         if self.scaler is not None:
             vector = self.scaler.transform(vector.reshape(1, -1))[0].astype(np.float32)
+            print(f"[DEBUG] After scale: mean={vector.mean():.3f} std={vector.std():.3f}")
 
         if mode == "static" and self.static_classifier:
             detected_sign, confidence = self.static_classifier.predict(vector)
