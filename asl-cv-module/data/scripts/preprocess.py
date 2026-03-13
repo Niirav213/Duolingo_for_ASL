@@ -145,15 +145,8 @@ def preprocess(val_size: float = 0.2, random_seed: int = 42):
 
     # ── Normalize features ──
     print("[Preprocess] Fitting StandardScaler on train set...")
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train).astype(np.float32)
-    X_val   = scaler.transform(X_val).astype(np.float32)
-
-    # Save scaler — needed at inference time
-    with open(OUT_DIR / "scaler.pkl", "wb") as f:
-        pickle.dump(scaler, f)
-    print("[Preprocess] Scaler saved to data/datasets/scaler.pkl")
-
+    X_train = X_train.astype(np.float32)
+    X_val   = X_val.astype(np.float32)
     # ── Save ──
     np.save(OUT_DIR / "X_train.npy", X_train)
     np.save(OUT_DIR / "y_train.npy", y_train)

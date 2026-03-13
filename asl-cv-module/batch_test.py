@@ -7,7 +7,7 @@ import os
 test_cases = [
     ("data/datasets/raw_images/A", "A"),
     ("data/datasets/raw_images/B", "B"),
-    ("data/datasets/raw_images/L", "L"),
+    ("data/datasets/raw_images/V", "V"),
 ]
 
 for folder, expected in test_cases:

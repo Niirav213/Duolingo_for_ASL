@@ -48,7 +48,7 @@ class ASLPipeline:
         print("[ASLPipeline] Initializing...")
 
         # ── Core components ──
-        self.detector = ASLDetector(model_complexity=1, draw_landmarks=False)
+        self.detector = ASLDetector(model_complexity=1, draw_landmarks=False, static_image_mode=True)
         self.extractor = ASLFeatureExtractor()
         self.scorer = ASLScorer()
         self.feedback_gen = FeedbackGenerator()
@@ -93,14 +93,6 @@ class ASLPipeline:
                 print(f"[ASLPipeline] WARNING: No dynamic checkpoint found at {dynamic_path}.")
         #scalar loading
         
-        scaler_path = Path("data/datasets/scaler.pkl")
-        if scaler_path.exists():
-            with open(scaler_path, "rb") as f:
-                self.scaler = pickle.load(f)
-            print("[ASLpipeline] Scalar found")
-        else:
-            self.scaler = None
-        print("[ASLPipeline] Ready.")
 
     def analyze_frame(
         self,
@@ -137,17 +129,11 @@ class ASLPipeline:
         # ── 4. Classify sign ──
         detected_sign, confidence = "", 0.0
 
-        # Apply scaler if available
-        vector = features.vector
-        print(f"[DEBUG] Before scale: mean={vector.mean():.3f} std={vector.std():.3f}")
-        if self.scaler is not None:
-            vector = self.scaler.transform(vector.reshape(1, -1))[0].astype(np.float32)
-            print(f"[DEBUG] After scale: mean={vector.mean():.3f} std={vector.std():.3f}")
 
         if mode == "static" and self.static_classifier:
-            detected_sign, confidence = self.static_classifier.predict(vector)
+            detected_sign, confidence = self.static_classifier.predict(features.vector)
         elif mode == "dynamic" and self.dynamic_classifier:
-            detected_sign, confidence = self.dynamic_classifier.predict(vector)
+            detected_sign, confidence = self.dynamic_classifier.predict(features.vector)
 
         # ── 5. Score against target ──
         score_result = self.scorer.score(features, target_sign)
