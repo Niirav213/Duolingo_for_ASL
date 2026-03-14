@@ -20,7 +20,10 @@ SCRIPT_DIR   = Path(__file__).resolve().parent
 DATA_DIR     = SCRIPT_DIR.parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
 
-RAW_DIR = DATA_DIR / "datasets" / "raw"
+RAW_DIRS = [
+    DATA_DIR / "datasets" / "raw",
+    DATA_DIR / "datasets" / "raw_2",
+]
 OUT_DIR = DATA_DIR / "datasets"
 
 # Minimum samples required to include a class
@@ -33,40 +36,40 @@ EXCLUDE_CLASSES = {"NOTHING", "SPACE", "DEL"}
 def load_raw_data():
     X, y = [], []
 
-    if not RAW_DIR.exists():
-        print(f"[Preprocess] Raw data directory not found: {RAW_DIR}")
-        return np.array([]), np.array([])
-
-    for sign_dir in sorted(RAW_DIR.iterdir()):
-        if not sign_dir.is_dir():
-            continue
-        sign = sign_dir.name.upper()
-
-        # Skip excluded classes
-        if sign in EXCLUDE_CLASSES:
-            print(f"[Preprocess] Skipping excluded class: {sign}")
+    for RAW_DIR in RAW_DIRS:
+        if not RAW_DIR.exists():
+            print(f"[Preprocess] Skipping missing dir: {RAW_DIR}")
             continue
 
-        samples = []
-        for npy_file in sign_dir.glob("*.npy"):
-            data = np.load(npy_file)
-            if data.ndim == 1:
-                data = data[np.newaxis, :]
-            samples.append(data)
+        for sign_dir in sorted(RAW_DIR.iterdir()):
+            if not sign_dir.is_dir():
+                continue
 
-        if not samples:
-            continue
+            sign = sign_dir.name.upper()
 
-        sign_data = np.vstack(samples)
+            if sign in EXCLUDE_CLASSES:
+                print(f"[Preprocess] Skipping excluded class: {sign}")
+                continue
 
-        # Skip classes with too few samples
-        if len(sign_data) < MIN_SAMPLES:
-            print(f"[Preprocess] Skipping '{sign}' — only {len(sign_data)} samples (min={MIN_SAMPLES})")
-            continue
+            samples = []
+            for npy_file in sign_dir.glob("*.npy"):
+                data = np.load(npy_file)
+                if data.ndim == 1:
+                    data = data[np.newaxis, :]
+                samples.append(data)
 
-        X.append(sign_data)
-        y.extend([sign] * len(sign_data))
-        print(f"[Preprocess] Loaded {len(sign_data):5d} samples for '{sign}'")
+            if not samples:
+                continue
+
+            sign_data = np.vstack(samples)
+
+            if len(sign_data) < MIN_SAMPLES:
+                print(f"[Preprocess] Skipping '{sign}' — only {len(sign_data)} samples (min={MIN_SAMPLES})")
+                continue
+
+            X.append(sign_data)
+            y.extend([sign] * len(sign_data))
+            print(f"[Preprocess] Loaded {len(sign_data):5d} samples for '{sign}'")
 
     if not X:
         return np.array([]), np.array([])

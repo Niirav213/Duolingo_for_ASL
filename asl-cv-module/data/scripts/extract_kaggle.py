@@ -64,10 +64,10 @@ DATA_DIR     = SCRIPT_DIR.parent                        # data/
 PROJECT_ROOT = SCRIPT_DIR.parent.parent                 # asl-cv-module/
 
 # Where your raw Kaggle images live
-INPUT_DIR = DATA_DIR / "datasets" / "raw_images"
+INPUT_DIR = DATA_DIR / "datasets" / "raw_images2" / "Train_Alphabet"
 
 # Where extracted .npy files will be saved
-OUTPUT_DIR = DATA_DIR / "datasets" / "raw"
+OUTPUT_DIR = DATA_DIR / "datasets" / "raw_2"
 
 # How many images to process per sign (None = all)
 # Set to 200 for faster testing, None for full dataset

@@ -5,9 +5,9 @@ import os
 
 # Test with actual Kaggle training images
 test_cases = [
-    ("data/datasets/raw_images/A", "A"),
-    ("data/datasets/raw_images/B", "B"),
-    ("data/datasets/raw_images/V", "V"),
+    ("data/datasets/raw_images2/Test_Alphabet/A", "A"),
+    ("data/datasets/raw_images2/Test_Alphabet/B", "B"),
+    ("data/datasets/raw_images2/Test_Alphabet/C", "C"),
 ]
 
 for folder, expected in test_cases:
