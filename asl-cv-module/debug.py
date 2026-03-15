@@ -11,7 +11,7 @@ from core.detector import ASLDetector
 from core.extractor import ASLFeatureExtractor
 
 # ── Load your test image ──
-image_path = r"C:\Users\ASUS\Downloads\asl_alphabet_train\asl_alphabet_train\A\A8.jpg"   # your test image
+image_path = r"E:\HCI project\asl-cv-module\data\datasets\raw_images2\Test_Alphabet\E\0b47f3b0-c5eb-497d-83f5-ddd9d5bc1354.rgb_0000.png"   # your test image
 frame = cv2.imread(image_path)
 
 if frame is None:
