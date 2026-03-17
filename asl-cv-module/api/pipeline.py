@@ -48,7 +48,7 @@ class ASLPipeline:
         print("[ASLPipeline] Initializing...")
 
         # ── Core components ──
-        self.detector = ASLDetector(model_complexity=1, draw_landmarks=False, static_image_mode=True)
+        self.detector = ASLDetector(model_complexity=1, draw_landmarks=False)
         self.extractor = ASLFeatureExtractor()
         self.scorer = ASLScorer()
         self.feedback_gen = FeedbackGenerator()

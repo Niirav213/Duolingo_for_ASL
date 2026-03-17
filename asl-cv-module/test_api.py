@@ -59,7 +59,7 @@ JOINT_TO_INDICES = {
 }
 
 
-def capture_frame(camera_index: int = 1) -> np.ndarray | None:
+def capture_frame(camera_index: int = 2) -> np.ndarray | None:
     cap = cv2.VideoCapture(camera_index)
     if not cap.isOpened():
         print(f"[ERROR] Could not open camera index {camera_index}.")
