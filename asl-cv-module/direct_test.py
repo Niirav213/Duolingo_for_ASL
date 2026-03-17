@@ -28,7 +28,7 @@ mp_hands = mp.solutions.hands.Hands(
 )
 
 import os
-folder = r"data\datasets\raw_images\A"
+folder = r"data\datasets\raw_images2\Test_Alphabet\A"
 files = os.listdir(folder)
 
 correct = 0
