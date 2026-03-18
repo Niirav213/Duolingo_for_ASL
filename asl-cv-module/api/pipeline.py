@@ -115,10 +115,11 @@ class ASLPipeline:
         """
         # ── 1. Decode frame ──
         frame = self._decode_frame(frame_base64)
-        frame = cv2.flip(frame, 1)
+        #frame = cv2.flip(frame, 1)
 
         # ── 2. Detect landmarks ──
         detection = self.detector.process_frame(frame)
+        print(f"Right detected: {detection.right_hand_detected}, Left detected: {detection.left_hand_detected}")
 
         if not detection.is_valid():
             return self._no_detection_response(target_sign)
