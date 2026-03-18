@@ -1,13 +1,19 @@
-"""ML Service FastAPI application for gesture detection."""
+"""
+ml-service/app/main.py
+-----------------------
+FastAPI ML service — updated to use the real asl-cv-module pipeline
+and return score + feedback fields alongside the prediction.
+"""
+
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import base64
 import cv2
 import numpy as np
 import logging
 import sys
-import random
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,13 +22,10 @@ try:
     from app.pipeline import MediaPipePipeline
 except ImportError as e:
     logger.error(f"Failed to import pipeline: {e}")
-    logger.error("Please ensure all dependencies are installed: pip install -r requirements.txt")
     sys.exit(1)
 
-# Initialize FastAPI app
-app = FastAPI(title="ASL Gesture Detection Service", version="1.0.0")
+app = FastAPI(title="ASL Gesture Detection Service", version="2.0.0")
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,59 +34,78 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize pipeline (will be loaded on startup)
 pipeline = None
 startup_complete = False
 
 
+# ─────────────────────────────────────────────
+# Schemas
+# ─────────────────────────────────────────────
+
 class GestureDetectionRequest(BaseModel):
-    """Request schema for gesture detection."""
-    image_data: str  # base64 encoded image
+    """Request schema — same as before so backend needs no changes."""
+    image_data: str          # base64 encoded image (no data-URL prefix needed)
+    target_sign: str = ""    # optional: if provided, score + feedback are returned
 
 
 class GestureDetectionResponse(BaseModel):
-    """Response schema for gesture detection."""
+    """
+    Extended response — backwards compatible.
+    predicted_class and confidence are the same fields as before.
+    score, is_correct, messages, joint_colors are new fields for the frontend.
+    """
     predicted_class: str
     confidence: float
-    landmarks: list = None
+    landmarks: Optional[list] = None
 
+    # ── New fields ──
+    score: float = 0.0
+    is_correct: bool = False
+    messages: list = []
+    joint_colors: dict = {}
+
+
+# ─────────────────────────────────────────────
+# Startup / Shutdown
+# ─────────────────────────────────────────────
 
 @app.on_event("startup")
 async def startup():
-    """Initialize models on startup."""
     global pipeline, startup_complete
     try:
         logger.info("Starting gesture detection service...")
-        pipeline = MediaPipePipeline(model_path="app/models/gesture_model.onnx")
+        pipeline = MediaPipePipeline()
         pipeline.load_model()
-        startup_complete = True
-        logger.info("✓ Gesture detection service started successfully")
+        startup_complete = pipeline.model_loaded
+        if startup_complete:
+            logger.info("Gesture detection service started successfully")
+        else:
+            logger.warning("Service started but model not loaded — check checkpoint path")
     except Exception as e:
-        logger.error(f"✗ Failed to start service: {e}")
+        logger.error(f"Failed to start service: {e}")
         startup_complete = False
-        # Don't exit - service can still run with mock predictions
 
 
 @app.on_event("shutdown")
 async def shutdown():
-    """Cleanup on shutdown."""
     global pipeline
     if pipeline:
         del pipeline
     logger.info("Gesture detection service stopped")
 
 
+# ─────────────────────────────────────────────
+# Endpoints
+# ─────────────────────────────────────────────
+
 @app.post("/predict", response_model=GestureDetectionResponse)
 async def predict_gesture(request: GestureDetectionRequest):
-    """Predict gesture from image."""
-    if not startup_complete:
-        logger.warning("Pipeline not fully initialized, using mock predictions")
-    
+    """Predict gesture from base64 image, with optional scoring."""
     try:
-        # Decode base64 image
+        # Decode image
         image_data = base64.b64decode(request.image_data)
-        nparr = np.frombuffer(image_data, np.uint8)
-        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        nparr  = np.frombuffer(image_data, np.uint8)
+        image  = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if image is None:
             raise HTTPException(
@@ -91,24 +113,17 @@ async def predict_gesture(request: GestureDetectionRequest):
                 detail="Invalid image data"
             )
 
-        # Perform prediction
-        if pipeline and startup_complete:
-            result = pipeline.predict(image)
-        else:
-            # Fallback to mock prediction
-            classes = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J",
-                      "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
-                      "U", "V", "W", "X", "Y", "Z", "SPACE"]
-            result = {
-                "class": random.choice(classes),
-                "confidence": 0.5 + random.random() * 0.5,
-                "landmarks": None
-            }
+        # Run pipeline
+        result = pipeline.predict(image, target_sign=request.target_sign)
 
         return GestureDetectionResponse(
-            predicted_class=result["class"],
-            confidence=result["confidence"],
-            landmarks=result.get("landmarks")
+            predicted_class = result["class"],
+            confidence      = result["confidence"],
+            landmarks       = result.get("landmarks"),
+            score           = result.get("score", 0.0),
+            is_correct      = result.get("is_correct", False),
+            messages        = result.get("messages", []),
+            joint_colors    = result.get("joint_colors", {}),
         )
 
     except HTTPException:
@@ -123,24 +138,26 @@ async def predict_gesture(request: GestureDetectionRequest):
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "ok", "service": "gesture-detection"}
+    return {
+        "status":        "ok",
+        "service":       "gesture-detection",
+        "model_loaded":  startup_complete,
+    }
 
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
     return {
-        "service": "ASL Gesture Detection",
-        "version": "1.0.0",
+        "service":   "ASL Gesture Detection",
+        "version":   "2.0.0",
         "endpoints": {
-            "predict": "/predict",
-            "health": "/health",
-            "docs": "/docs"
+            "predict": "POST /predict",
+            "health":  "GET  /health",
+            "docs":    "GET  /docs",
         }
     }
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8001, reload=True)

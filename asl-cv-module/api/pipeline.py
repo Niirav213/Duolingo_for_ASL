@@ -14,48 +14,39 @@ import numpy as np
 import torch
 from pathlib import Path
 import json
-import pickle
 
-from core.detector import ASLDetector
+from core.detector import ASLDetector, Landmark
 from core.extractor import ASLFeatureExtractor
 from core.scorer import ASLScorer
-from feedback.generator import FeedbackGenerator, FeedbackResult
+from feedback.generator import FeedbackGenerator
 from models.static import StaticSignClassifier
 from models.dynamic import DynamicSignClassifier
 from api.schemas import AnalyzeFrameResponse, JointScores
 
-# ── Model registry — edit to swap models ──
 MODEL_REGISTRY = {
-    "static": "models/checkpoints/static_sign_best.pt",
+    "static":  "models/checkpoints/static_sign_best.pt",
     "dynamic": "models/checkpoints/dynamic_sign.pt",
 }
 
 
 class ASLPipeline:
-    """
-    Full ASL CV pipeline — instantiated ONCE at server startup.
-
-    Call analyze_frame() for every incoming frame.
-    """
+    """Full ASL CV pipeline — instantiated ONCE at server startup."""
 
     def __init__(
-    self,
-    load_static: bool = True,
-    load_dynamic: bool = True,
-    static_labels: list[str] = None,
-    dynamic_labels: list[str] = None,
+        self,
+        load_static: bool = True,
+        load_dynamic: bool = True,
+        static_labels: list[str] = None,
+        dynamic_labels: list[str] = None,
     ):
         print("[ASLPipeline] Initializing...")
 
-        # ── Core components ──
-        self.detector = ASLDetector(model_complexity=1, draw_landmarks=False)
-        self.extractor = ASLFeatureExtractor()
-        self.scorer = ASLScorer()
+        self.detector     = ASLDetector(model_complexity=0, draw_landmarks=False)
+        self.extractor    = ASLFeatureExtractor()
+        self.scorer       = ASLScorer()
         self.feedback_gen = FeedbackGenerator()
 
-        # ── Load label map from file ──
-        import json
-        from pathlib import Path
+        # ── Load label map ──
         label_map_path = Path("data/datasets/label_map.json")
         if label_map_path.exists():
             with open(label_map_path) as f:
@@ -76,7 +67,7 @@ class ASLPipeline:
             if Path(static_path).exists():
                 self.static_classifier.load(static_path)
             else:
-                print(f"[ASLPipeline] WARNING: No static checkpoint found at {static_path}.")
+                print(f"[ASLPipeline] WARNING: No static checkpoint at {static_path}.")
 
         # ── Dynamic classifier ──
         self.dynamic_classifier = None
@@ -90,9 +81,13 @@ class ASLPipeline:
             if Path(dynamic_path).exists():
                 self.dynamic_classifier.load(dynamic_path)
             else:
-                print(f"[ASLPipeline] WARNING: No dynamic checkpoint found at {dynamic_path}.")
-        #scalar loading
-        
+                print(f"[ASLPipeline] WARNING: No dynamic checkpoint at {dynamic_path}.")
+
+        print("[ASLPipeline] Ready.")
+
+    # ─────────────────────────────────────────
+    # Public API
+    # ─────────────────────────────────────────
 
     def analyze_frame(
         self,
@@ -101,60 +96,63 @@ class ASLPipeline:
         mode: str = "static",
         include_landmarks: bool = False,
     ) -> AnalyzeFrameResponse:
-        """
-        Full pipeline: base64 frame → JSON response.
+        """Full pipeline: base64 frame → JSON response."""
 
-        Args:
-            frame_base64: base64-encoded JPEG/PNG image string
-            target_sign: the ASL sign the user is attempting
-            mode: "static" for letters, "dynamic" for word signs
-            include_landmarks: whether to include raw landmarks in response
-
-        Returns:
-            AnalyzeFrameResponse — ready to serialize to JSON
-        """
-        # ── 1. Decode frame ──
+        # ── 1. Decode + flip frame ──
         frame = self._decode_frame(frame_base64)
-        #frame = cv2.flip(frame, 1)
+        frame = cv2.flip(frame, 1)
 
         # ── 2. Detect landmarks ──
         detection = self.detector.process_frame(frame)
-        print(f"Right detected: {detection.right_hand_detected}, Left detected: {detection.left_hand_detected}")
 
         if not detection.is_valid():
             return self._no_detection_response(target_sign)
 
-        # ── 3. Extract features ──
+        # ── 3. Mirror left hand → treat as right hand ──
+        # The model was trained only on right hand data (Kaggle dataset).
+        # If only a left hand is detected, flip its x landmarks so the
+        # feature vector matches the right-hand training distribution.
+        if detection.left_hand_detected and not detection.right_hand_detected:
+            detection.right_hand = [
+                Landmark(x=1.0 - lm.x, y=lm.y, z=lm.z)
+                for lm in detection.left_hand
+            ]
+            detection.right_hand_detected = True
+            detection.left_hand = None
+            detection.left_hand_detected = False
+
+        # ── 4. Extract features ──
         features = self.extractor.extract(detection)
 
-        # ── 4. Classify sign ──
+        # ── 5. Classify ──
         detected_sign, confidence = "", 0.0
-
-
         if mode == "static" and self.static_classifier:
             detected_sign, confidence = self.static_classifier.predict(features.vector)
         elif mode == "dynamic" and self.dynamic_classifier:
             detected_sign, confidence = self.dynamic_classifier.predict(features.vector)
 
-        # ── 5. Score against target ──
+        # ── 6. Score ──
         score_result = self.scorer.score(features, target_sign)
 
-        # ── 6. Generate feedback ──
+        # ── 7. Feedback ──
         feedback = self.feedback_gen.generate(score_result)
 
-        # ── 7. Build response ──
+        # ── 8. Build response ──
         joint_scores = JointScores(**{
             k: v for k, v in score_result.joint_scores.items()
             if k in JointScores.model_fields
         })
-        joint_scores.position = score_result.position_score
+        joint_scores.position    = score_result.position_score
         joint_scores.orientation = score_result.orientation_score
 
         landmarks = None
         if include_landmarks and detection.right_hand:
             landmarks = {
-                "right_hand": [{"x": lm.x, "y": lm.y, "z": lm.z} for lm in detection.right_hand],
-                "left_hand": [{"x": lm.x, "y": lm.y, "z": lm.z} for lm in detection.left_hand] if detection.left_hand else [],
+                "right_hand": [
+                    {"x": lm.x, "y": lm.y, "z": lm.z}
+                    for lm in detection.right_hand
+                ],
+                "left_hand": [],
             }
 
         return AnalyzeFrameResponse(
@@ -171,16 +169,17 @@ class ASLPipeline:
             landmarks=landmarks,
         )
 
+    # ─────────────────────────────────────────
+    # Helpers
+    # ─────────────────────────────────────────
+
     def _decode_frame(self, frame_base64: str) -> np.ndarray:
         """Decode base64 image string to OpenCV BGR numpy array."""
-        # Strip data URL prefix if present (e.g. "data:image/jpeg;base64,...")
         if "," in frame_base64:
             frame_base64 = frame_base64.split(",")[1]
-
         img_bytes = base64.b64decode(frame_base64)
         img_array = np.frombuffer(img_bytes, dtype=np.uint8)
         frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-
         if frame is None:
             raise ValueError("[ASLPipeline] Failed to decode frame.")
         return frame
