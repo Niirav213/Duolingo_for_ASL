@@ -1,16 +1,15 @@
-import React, { useState } from 'react'
-import './App.css'
-import Layout from './components/Layout'
-import PathView from './pages/PathView'
-import LessonView from './pages/LessonView'
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuthStore } from './store';
+import './App.css';
+import Layout from './components/Layout';
+import PathView from './pages/PathView';
+import LessonView from './pages/LessonView';
+import Login from './pages/Login';
 
-function App() {
+function MainApp() {
   const [currentView, setCurrentView] = useState('path'); // 'path' or 'lesson'
-  
-  // Track which alphabet letters the user has successfully completed
   const [completedLevels, setCompletedLevels] = useState([]);
-  
-  // The specific lesson node being played (e.g. { id: 'A', mode: 'training' })
   const [activeLesson, setActiveLesson] = useState(null);
 
   const handleStartLesson = (lessonConfig) => {
@@ -42,7 +41,34 @@ function App() {
         />
       )}
     </>
-  )
+  );
 }
 
-export default App
+function ProtectedRoute({ children }) {
+  const { accessToken } = useAuthStore();
+  if (!accessToken) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+}
+
+function App() {
+  // Try to load user profile on mount if we have a token (optional check)
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route 
+          path="/*" 
+          element={
+            <ProtectedRoute>
+              <MainApp />
+            </ProtectedRoute>
+          } 
+        />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;

@@ -12,15 +12,15 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/analyze': {
-        target: 'http://localhost:8001',
+        target: 'http://localhost:8002',
         changeOrigin: true,
       },
       '/health': {
-        target: 'http://localhost:8001',
+        target: 'http://localhost:8002',
         changeOrigin: true,
       },
       '/signs': {
-        target: 'http://localhost:8001',
+        target: 'http://localhost:8002',
         changeOrigin: true,
       },
     },

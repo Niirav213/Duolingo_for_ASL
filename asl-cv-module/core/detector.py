@@ -2,8 +2,7 @@
 core/detector.py
 ----------------
 MediaPipe Hands wrapper for ASL landmark detection.
-Uses mp.solutions.hands — the same model used in extract_kaggle.py during
-training — to ensure train/inference consistency.
+Updated to use the mediapipe Tasks API (mediapipe 0.10+).
 
 Usage:
     detector = ASLDetector()
@@ -15,6 +14,12 @@ import mediapipe as mp
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional
+from pathlib import Path
+
+from mediapipe.tasks import python as mp_python
+from mediapipe.tasks.python import vision as mp_vision
+from mediapipe.tasks.python.vision import HandLandmarker, HandLandmarkerOptions, RunningMode
+
 
 
 # ─────────────────────────────────────────────
@@ -70,22 +75,19 @@ class DetectionResult:
 
 class ASLDetector:
     """
-    Wraps MediaPipe Hands for ASL landmark extraction.
-
-    Uses mp.solutions.hands — identical to the model used in extract_kaggle.py
-    during training — so landmark coordinates are consistent between
-    training data and live webcam inference.
-
-    Designed to be instantiated ONCE and reused across frames.
-    Loading MediaPipe is expensive — never instantiate per-frame.
+    Wraps MediaPipe HandLandmarker for ASL landmark extraction.
+    Updated to use mediapipe Tasks API (mediapipe 0.10+).
 
     Args:
-        min_detection_confidence (float): Confidence threshold for initial detection.
-        min_tracking_confidence (float): Confidence threshold for tracking across frames.
-        model_complexity (int): 0 = lite (fastest), 1 = full (matches training), 2 = heavy.
+        min_detection_confidence (float): Confidence threshold for detection.
+        min_tracking_confidence (float): Confidence threshold for tracking.
+        model_complexity (int): Unused, kept for API compatibility.
         include_face (bool): Unused — kept for API compatibility.
         draw_landmarks (bool): Whether to draw skeleton on the annotated frame.
     """
+
+    # Path to the hand landmarker model bundle
+    MODEL_PATH = str(Path(__file__).parent.parent / "models" / "hand_landmarker.task")
 
     HAND_LANDMARKS = {
         "wrist": 0,
@@ -96,7 +98,6 @@ class ASLDetector:
         "pinky_mcp": 17, "pinky_pip": 18, "pinky_dip": 19, "pinky_tip": 20,
     }
 
-    # Kept for backward compatibility with any code that reads POSE_LANDMARKS
     POSE_LANDMARKS = {
         "nose": 0,
         "left_shoulder": 11, "right_shoulder": 12,
@@ -114,24 +115,18 @@ class ASLDetector:
         draw_landmarks: bool = True,
     ):
         self.draw_landmarks = draw_landmarks
-        self.include_face = include_face  # unused, kept for API compatibility
+        self.include_face = include_face
 
-        self._mp_hands = mp.solutions.hands
-        self._mp_drawing = mp.solutions.drawing_utils
-        self._mp_drawing_styles = mp.solutions.drawing_styles
-
-        # static_image_mode=False → enables inter-frame tracking for webcam streams,
-        # while still using the same underlying Hands model as extract_kaggle.py.
-        # model_complexity=1 matches extract_kaggle.py exactly.
-        self._hands = self._mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=2,
-            min_detection_confidence=min_detection_confidence,
+        options = HandLandmarkerOptions(
+            base_options=mp_python.BaseOptions(model_asset_path=self.MODEL_PATH),
+            running_mode=RunningMode.IMAGE,
+            num_hands=2,
+            min_hand_detection_confidence=min_detection_confidence,
             min_tracking_confidence=min_tracking_confidence,
-            model_complexity=model_complexity,
         )
+        self._landmarker = HandLandmarker.create_from_options(options)
 
-        print("[ASLDetector] Initialized MediaPipe Hands successfully.")
+        print("[ASLDetector] Initialized MediaPipe HandLandmarker successfully.")
 
     # ─────────────────────────────────────────
     # Main Method
@@ -150,26 +145,30 @@ class ASLDetector:
         if frame is None or frame.size == 0:
             raise ValueError("[ASLDetector] Received empty frame.")
 
-        # MediaPipe requires RGB
+        # Tasks API requires RGB mediapipe.Image
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        rgb_frame.flags.writeable = False  # performance optimization
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
 
-        mp_result = self._hands.process(rgb_frame)
+        detection = self._landmarker.detect(mp_image)
 
-        rgb_frame.flags.writeable = True
-
-        result = DetectionResult(raw_result=mp_result)
+        result = DetectionResult(raw_result=detection)
 
         # ── Extract Hand Landmarks ──
-        # mp.solutions.hands returns a list of detected hands + their handedness.
-        # We iterate handedness to correctly assign left vs right.
-        if mp_result.multi_hand_landmarks and mp_result.multi_handedness:
-            for hand_landmarks, handedness in zip(
-                mp_result.multi_hand_landmarks,
-                mp_result.multi_handedness,
+        if detection.hand_landmarks and detection.handedness:
+            for hand_landmarks_list, handedness_list in zip(
+                detection.hand_landmarks,
+                detection.handedness,
             ):
-                label = handedness.classification[0].label  # "Left" or "Right"
-                landmarks = self._parse_landmarks(hand_landmarks.landmark)
+                label = handedness_list[0].category_name  # "Left" or "Right"
+                landmarks = [
+                    Landmark(
+                        x=lm.x,
+                        y=lm.y,
+                        z=lm.z,
+                        visibility=getattr(lm, "visibility", 1.0),
+                    )
+                    for lm in hand_landmarks_list
+                ]
 
                 if label == "Right":
                     result.right_hand = landmarks
@@ -178,42 +177,12 @@ class ASLDetector:
                     result.left_hand = landmarks
                     result.left_hand_detected = True
 
-        # ── Draw Skeleton on Frame ──
-        if self.draw_landmarks:
-            result.annotated_frame = self._draw(frame.copy(), mp_result)
-        else:
-            result.annotated_frame = frame.copy()
-
+        result.annotated_frame = frame.copy()
         return result
 
     # ─────────────────────────────────────────
     # Helpers
     # ─────────────────────────────────────────
-
-    def _parse_landmarks(self, raw_landmarks) -> list[Landmark]:
-        """Convert MediaPipe landmark objects to our Landmark dataclass."""
-        return [
-            Landmark(
-                x=lm.x,
-                y=lm.y,
-                z=lm.z,
-                visibility=getattr(lm, "visibility", 1.0),
-            )
-            for lm in raw_landmarks
-        ]
-
-    def _draw(self, frame: np.ndarray, mp_result) -> np.ndarray:
-        """Draw hand skeleton overlays on the frame."""
-        if mp_result.multi_hand_landmarks:
-            for hand_landmarks in mp_result.multi_hand_landmarks:
-                self._mp_drawing.draw_landmarks(
-                    frame,
-                    hand_landmarks,
-                    self._mp_hands.HAND_CONNECTIONS,
-                    self._mp_drawing_styles.get_default_hand_landmarks_style(),
-                    self._mp_drawing_styles.get_default_hand_connections_style(),
-                )
-        return frame
 
     def get_landmark_by_name(
         self,
@@ -221,17 +190,7 @@ class ASLDetector:
         name: str,
         hand: str = "right",
     ) -> Optional[Landmark]:
-        """
-        Convenience method to get a specific landmark by name.
-
-        Args:
-            result: DetectionResult from process_frame()
-            name: Landmark name (e.g. 'index_tip', 'wrist')
-            hand: 'right' or 'left'
-
-        Returns:
-            Landmark or None
-        """
+        """Get a specific landmark by name."""
         if name in self.HAND_LANDMARKS:
             idx = self.HAND_LANDMARKS[name]
             hand_data = result.right_hand if hand == "right" else result.left_hand
@@ -241,7 +200,7 @@ class ASLDetector:
 
     def release(self):
         """Release MediaPipe resources. Call when done."""
-        self._hands.close()
+        self._landmarker.close()
         print("[ASLDetector] Resources released.")
 
     def __enter__(self):
