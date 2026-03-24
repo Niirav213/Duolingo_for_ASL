@@ -13,6 +13,8 @@ class User(Base):
     email            = Column(String(100), unique=True, nullable=False, index=True)
     hashed_password  = Column(String(255), nullable=False)
     is_active        = Column(Boolean, default=True)
+    hearts           = Column(Integer, default=5)
+    last_heart_refill= Column(DateTime, nullable=True)
     created_at       = Column(DateTime, default=datetime.utcnow)
     updated_at       = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

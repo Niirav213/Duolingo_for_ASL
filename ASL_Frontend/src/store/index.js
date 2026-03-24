@@ -81,10 +81,42 @@ export const useAuthStore = create((set) => ({
 
 export const useGameStore = create((set) => ({
     currentSession: null,
-    userStats: null,
-    streak: null,
+    userStats: { total_xp: 0, current_streak: 0, longest_streak: 0, lessons_completed: 0, hearts: 5 },
+    streak: { current_streak: 0, longest_streak: 0 },
     sessions: [],
     isLoading: false,
+
+    loseHeart: async () => {
+        try {
+            const response = await fetch('/api/v1/game/hearts/lose', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${useAuthStore.getState().accessToken}` },
+            });
+            if (response.ok) {
+                const data = await response.json();
+                set((state) => ({ userStats: { ...state.userStats, hearts: data.hearts } }));
+                return data.hearts;
+            }
+        } catch (error) {
+            console.error('Failed to lose heart:', error);
+        }
+    },
+
+    refillHearts: async () => {
+        try {
+            const response = await fetch('/api/v1/game/hearts/refill', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${useAuthStore.getState().accessToken}` },
+            });
+            if (response.ok) {
+                const data = await response.json();
+                set((state) => ({ userStats: { ...state.userStats, hearts: data.hearts } }));
+                return data.hearts;
+            }
+        } catch (error) {
+            console.error('Failed to refill hearts:', error);
+        }
+    },
 
     startSession: async(lessonId) => {
         set({ isLoading: true });
@@ -113,7 +145,7 @@ export const useGameStore = create((set) => ({
     endSession: async(sessionId, score, accuracy, duration) => {
         try {
             const response = await fetch(
-                `/api/v1/game/session/${sessionId}/end?score=${score}&accuracy=${accuracy}&duration_seconds=${duration}`, {
+                `/api/v1/game/session/${sessionId}/end?score=${Math.round(score)}&accuracy=${accuracy}&duration_seconds=${duration}`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${useAuthStore.getState().accessToken}`,
@@ -125,6 +157,13 @@ export const useGameStore = create((set) => ({
 
             const data = await response.json();
             set({ currentSession: null });
+            
+            // Refresh stats after session ends
+            const stats = await fetch('/api/v1/game/stats', {
+                headers: { 'Authorization': `Bearer ${useAuthStore.getState().accessToken}` },
+            }).then(r => r.json());
+            set({ userStats: stats });
+            
             return data;
         } catch (error) {
             console.error(error);

@@ -28,6 +28,9 @@ const CameraDetector = ({ targetSign, onCorrectSign }) => {
   const [feedback, setFeedback] = useState([]);
   const [score, setScore] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [detectedSign, setDetectedSign] = useState(null);
+  const isAnalyzingRef = useRef(false);
+  const matchCountRef = useRef(0);  // Track consecutive correct matches
 
   useEffect(() => {
     let stream = null;
@@ -98,12 +101,13 @@ const drawTracking = useCallback((result) => {
   ctx.restore();
 }, []);
 
-  // 3. REPLACE YOUR OLD analyzeFrame WITH THIS
-const analyzeFrame = useCallback(async () => {
-  if (!videoRef.current || isAnalyzing) return;
+  // 3. Frame analysis function
+  const analyzeFrame = useCallback(async () => {
+  if (!videoRef.current || isAnalyzingRef.current) return;
   const video = videoRef.current;
   if (video.videoWidth === 0) return;
 
+  isAnalyzingRef.current = true;
   setIsAnalyzing(true);
   const canvas = captureCanvasRef.current;
   canvas.width = video.videoWidth;
@@ -114,8 +118,8 @@ const analyzeFrame = useCallback(async () => {
   const frameBase64 = canvas.toDataURL('image/jpeg', 0.5);
 
   try {
-    // Connect to the CV-Module on 8001
-    const response = await fetch('/cv/analyze', { 
+    // Connect to the CV-Module
+    const response = await fetch('/analyze', { 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -127,24 +131,62 @@ const analyzeFrame = useCallback(async () => {
     });
 
     const result = await response.json();
+    console.log('[CV Response]', { 
+      hand: result.hand_detected, 
+      sign: result.detected_sign, 
+      conf: result.confidence,
+      score: result.overall_score, 
+      correct: result.is_correct,
+      target: targetSign 
+    });
     
     if (result.hand_detected && result.landmarks) {
       setScore(result.overall_score || 0);
       setFeedback(result.messages || []);
+      setDetectedSign(result.detected_sign || null);
       drawTracking(result); // This draws the skeleton
       
-      if (result.is_correct) onCorrectSign(result.overall_score);
+      // Check if sign matches - use both is_correct flag AND manual sign comparison
+      const signMatchesTarget = result.detected_sign && 
+        result.detected_sign.toUpperCase() === targetSign.toUpperCase();
+      
+      if (result.is_correct || (signMatchesTarget && result.confidence >= 0.35)) {
+        matchCountRef.current += 1;
+        console.log(`[MATCH] Count: ${matchCountRef.current}`);
+        // Require 2 consecutive matches for reliability
+        if (matchCountRef.current >= 2) {
+          const finalScore = Math.max(result.overall_score || 0, result.confidence * 100 || 60);
+          console.log(`[CORRECT SIGN TRIGGERED] Score: ${finalScore}`);
+          onCorrectSign(finalScore);
+          matchCountRef.current = 0;
+        }
+      } else {
+        matchCountRef.current = 0;
+      }
     } else {
       setScore(0);
+      setDetectedSign(null);
+      setFeedback([]);
+      matchCountRef.current = 0;
       const oc = overlayCanvasRef.current;
       if (oc) oc.getContext('2d').clearRect(0, 0, oc.width, oc.height);
     }
   } catch (err) {
-    console.error("Make sure your CV module is running on port 8001");
+    console.error("CV analysis error:", err.message);
   } finally {
+    isAnalyzingRef.current = false;
     setIsAnalyzing(false);
   }
-}, [targetSign, onCorrectSign, isAnalyzing, drawTracking]);
+}, [targetSign, onCorrectSign, drawTracking]);
+
+  // 4. CONTINUOUS ANALYSIS LOOP — runs every 500ms
+  useEffect(() => {
+    if (!hasPermission) return;
+    const intervalId = setInterval(() => {
+      analyzeFrame();
+    }, 500);
+    return () => clearInterval(intervalId);
+  }, [hasPermission, analyzeFrame]);
 
   return (
     <div className="camera-detector-container">
@@ -160,6 +202,24 @@ const analyzeFrame = useCallback(async () => {
             <div className={`score-badge ${score >= 75 ? 'good' : 'bad'}`}>
               Score: {Math.round(score)}
             </div>
+            {detectedSign && (
+              <div style={{
+                position: 'absolute', top: '12px', left: '12px',
+                background: detectedSign === targetSign ? '#00d250' : '#ff6b35',
+                color: 'white', padding: '8px 16px', borderRadius: '12px',
+                fontWeight: 'bold', fontSize: '1.1rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+              }}>
+                Detected: {detectedSign}
+              </div>
+            )}
+            {isAnalyzing && (
+              <div style={{
+                position: 'absolute', bottom: '12px', left: '12px',
+                background: 'rgba(0,0,0,0.6)', color: '#4af', padding: '4px 10px',
+                borderRadius: '8px', fontSize: '0.8rem'
+              }}>⏳ Analyzing...</div>
+            )}
           </div>
           
           {feedback.length > 0 && (

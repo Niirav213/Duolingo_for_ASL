@@ -62,36 +62,52 @@ async def websocket_gesture_endpoint(
             # Process gesture if image data is provided
             if "image_data" in message and "lesson_id" in message:
                 try:
-                    # Send to ML service for detection
-                    async with httpx.AsyncClient() as client:
-                        ml_response = await client.post(
-                            f"{settings.ml_service_url}{settings.ml_service_predict_endpoint}",
-                            json={
-                                "image_data": message["image_data"]
-                            },
-                            timeout=30.0
+                    # Dynamically get cv_router to avoid circular/path issues at startup
+                    cv_router = None
+                    try:
+                        import api.router as _cv_router
+                        cv_router = _cv_router
+                    except ImportError:
+                        pass
+
+                    # Priority 1: Use internal CV pipeline if available
+                    if cv_router and getattr(cv_router, "pipeline", None):
+                        result = cv_router.pipeline.analyze_frame(
+                            frame_base64=message["image_data"],
+                            target_sign=message.get("expected_sign", ""),
+                            mode="static",
+                            include_landmarks=True
                         )
+                        response = {
+                            "status": "success",
+                            "detected_sign": result.detected_sign,
+                            "confidence": result.confidence,
+                            "expected_sign": message.get("expected_sign"),
+                            "correct": result.is_correct,
+                            "overall_score": result.overall_score
+                        }
+                    # Priority 2: Fallback to external ML service
+                    else:
+                        async with httpx.AsyncClient() as client:
+                            ml_response = await client.post(
+                                f"{settings.ml_service_url}{settings.ml_service_predict_endpoint}",
+                                json={"image_data": message["image_data"]},
+                                timeout=30.0
+                            )
 
-                        if ml_response.status_code == 200:
-                            prediction = ml_response.json()
-
-                            response = {
-                                "status": "success",
-                                "detected_sign": prediction.get("predicted_class"),
-                                "confidence": prediction.get("confidence", 0),
-                                "expected_sign": message.get("expected_sign"),
-                                "correct": prediction.get("predicted_class") == message.get("expected_sign")
-                            }
-                        else:
-                            response = {
-                                "status": "error",
-                                "message": "ML service error"
-                            }
+                            if ml_response.status_code == 200:
+                                prediction = ml_response.json()
+                                response = {
+                                    "status": "success",
+                                    "detected_sign": prediction.get("predicted_class"),
+                                    "confidence": prediction.get("confidence", 0),
+                                    "expected_sign": message.get("expected_sign"),
+                                    "correct": prediction.get("predicted_class") == message.get("expected_sign")
+                                }
+                            else:
+                                response = {"status": "error", "message": "ML service error"}
                 except Exception as e:
-                    response = {
-                        "status": "error",
-                        "message": str(e)
-                    }
+                    response = {"status": "error", "message": str(e)}
 
                 await websocket.send_json(response)
 

@@ -100,3 +100,25 @@ async def get_user_streak(
     """Get user streak information."""
     streak_info = await StreakService.get_user_streak(db, current_user.id)
     return streak_info
+
+
+@router.post("/hearts/lose")
+async def lose_heart(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Deduct a heart when a user fails a lesson element."""
+    result = await GameEngine.lose_heart(db, current_user.id)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("message"))
+    return result
+
+
+@router.post("/hearts/refill")
+async def refill_hearts(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Refill a user's hearts."""
+    result = await GameEngine.refill_hearts(db, current_user.id)
+    return result

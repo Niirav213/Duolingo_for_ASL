@@ -21,18 +21,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 # --- MODULE IMPORTS ---
-try:
-    from app.db.base import Base
-    from app.db.session import engine
-    from app.api import auth, game, ws_game
-    from app.core.config import settings
-    
-    from api.router import app as cv_app
-    from api.pipeline import ASLPipeline
-    import api.router as cv_router
-except ImportError as e:
-    print(f"Error importing modules: {e}")
-    sys.exit(1)
+from app.db.base import Base
+from app.db.session import engine
+from app.api import auth, game, ws_game
+from app.core.config import settings
+
+from api.router import app as cv_app
+from api.pipeline import ASLPipeline
+import api.router as cv_router
 
 # --- UNIFIED LIFESPAN ---
 @asynccontextmanager

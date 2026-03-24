@@ -4,6 +4,7 @@ from sqlalchemy import select
 from app.models.user_progress import UserProgress
 from app.models.game_session import GameSession
 from app.models.streak import Streak
+from app.models.user import User
 from datetime import datetime
 
 
@@ -85,9 +86,49 @@ class GameEngine:
         streak_result = await db.execute(streak_stmt)
         streak = streak_result.scalars().first()
 
+        # Get user hearts
+        stmt_user = select(User).where(User.id == user_id)
+        user_result = await db.execute(stmt_user)
+        user = user_result.scalars().first()
+
         return {
             "total_xp": total_xp,
             "current_streak": streak.current_streak if streak else 0,
             "longest_streak": streak.longest_streak if streak else 0,
-            "lessons_completed": len(progress_records)
+            "lessons_completed": len(progress_records),
+            "hearts": user.hearts if user else 5
         }
+
+    @staticmethod
+    async def lose_heart(
+        db: AsyncSession,
+        user_id: int
+    ) -> dict:
+        """Deduct one heart from the user."""
+        stmt = select(User).where(User.id == user_id)
+        result = await db.execute(stmt)
+        user = result.scalars().first()
+        
+        if user and user.hearts > 0:
+            user.hearts -= 1
+            await db.commit()
+            await db.refresh(user)
+            return {"status": "success", "hearts": user.hearts}
+        return {"status": "error", "message": "No hearts left"}
+
+    @staticmethod
+    async def refill_hearts(
+        db: AsyncSession,
+        user_id: int
+    ) -> dict:
+        """Refill user hearts to maximum (5)."""
+        stmt = select(User).where(User.id == user_id)
+        result = await db.execute(stmt)
+        user = result.scalars().first()
+        
+        if user:
+            user.hearts = 5
+            await db.commit()
+            await db.refresh(user)
+            return {"status": "success", "hearts": 5}
+        return {"status": "error"}

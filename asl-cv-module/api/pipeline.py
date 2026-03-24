@@ -21,6 +21,7 @@ from core.scorer import ASLScorer
 from feedback.generator import FeedbackGenerator
 from models.static import StaticSignClassifier
 from models.dynamic import DynamicSignClassifier
+from models.rule_based import RuleBasedASLClassifier
 from api.schemas import AnalyzeFrameResponse, JointScores
 
 MODEL_REGISTRY = {
@@ -57,17 +58,21 @@ class ASLPipeline:
 
         # ── Static classifier ──
         self.static_classifier = None
+        self.use_rule_based = False
         if load_static:
             labels_to_use = static_labels or loaded_labels
-            self.static_classifier = StaticSignClassifier(
-                num_classes=len(labels_to_use),
-                labels=labels_to_use,
-            )
             static_path = MODEL_REGISTRY["static"]
             if Path(static_path).exists():
+                self.static_classifier = StaticSignClassifier(
+                    num_classes=len(labels_to_use),
+                    labels=labels_to_use,
+                )
                 self.static_classifier.load(static_path)
+                print(f"[ASLPipeline] Loaded trained static classifier.")
             else:
-                print(f"[ASLPipeline] WARNING: No static checkpoint at {static_path}.")
+                print(f"[ASLPipeline] No trained model at {static_path}. Using rule-based classifier.")
+                self.rule_classifier = RuleBasedASLClassifier()
+                self.use_rule_based = True
 
         # ── Dynamic classifier ──
         self.dynamic_classifier = None
@@ -126,16 +131,43 @@ class ASLPipeline:
 
         # ── 5. Classify ──
         detected_sign, confidence = "", 0.0
-        if mode == "static" and self.static_classifier:
-            detected_sign, confidence = self.static_classifier.predict(features.vector)
+        if mode == "static":
+            if self.use_rule_based:
+                detected_sign, confidence = self.rule_classifier.predict(features.vector)
+            elif self.static_classifier:
+                detected_sign, confidence = self.static_classifier.predict(features.vector)
         elif mode == "dynamic" and self.dynamic_classifier:
             detected_sign, confidence = self.dynamic_classifier.predict(features.vector)
 
         # ── 6. Score ──
         score_result = self.scorer.score(features, target_sign)
 
+        # If scorer returned zero (no reference files), use classifier match instead
+        sign_matches = (detected_sign.upper() == target_sign.upper()) and confidence >= 0.35
+        
+        print(f"[DEBUG] Target: '{target_sign}', Detected: '{detected_sign}', Confidence: {confidence}, Sign Matches: {sign_matches}")
+        
+        if score_result.overall_score == 0.0 and sign_matches:
+            score_result.overall_score = confidence * 100
+            score_result.is_correct = True
+        elif score_result.overall_score == 0.0 and detected_sign:
+            # Hand detected but wrong sign — give partial score
+            score_result.overall_score = confidence * 30
+            score_result.is_correct = False
+
+        print(f"[DEBUG] Final Score: {score_result.overall_score}, is_correct: {score_result.is_correct}")
+
         # ── 7. Feedback ──
         feedback = self.feedback_gen.generate(score_result)
+        
+        # Override feedback messages based on classifier result
+        if sign_matches and not feedback.messages:
+            feedback.messages = [f"Great job! You signed '{target_sign}' correctly!"]
+            feedback.praise = "Perfect!"
+            feedback.emoji = "🎉"
+        elif detected_sign and not sign_matches and not feedback.messages:
+            feedback.messages = [f"You're signing '{detected_sign}' — try '{target_sign}' instead."]
+            feedback.emoji = "🤔"
 
         # ── 8. Build response ──
         joint_scores = JointScores(**{
