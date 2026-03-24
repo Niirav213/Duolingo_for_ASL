@@ -64,6 +64,13 @@ const drawTracking = useCallback((result) => {
   canvas.height = h;
   ctx.clearRect(0, 0, w, h);
 
+  // Safely extract the array from the backend's dictionary payload
+  const landmarksArray = Array.isArray(result.landmarks) 
+    ? result.landmarks 
+    : (result.landmarks.right_hand || result.landmarks.left_hand || []);
+
+  if (!landmarksArray || landmarksArray.length === 0) return;
+
   ctx.save();
   // Mirror the drawing to match the webcam CSS
   ctx.translate(w, 0);
@@ -73,8 +80,8 @@ const drawTracking = useCallback((result) => {
   ctx.strokeStyle = "rgba(160, 160, 160, 0.6)";
   ctx.lineWidth = 2;
   HAND_CONNECTIONS.forEach(([a, b]) => {
-    const start = result.landmarks[a];
-    const end = result.landmarks[b];
+    const start = landmarksArray[a];
+    const end = landmarksArray[b];
     if (start && end) {
       ctx.beginPath();
       ctx.moveTo(start.x * w, start.y * h);
@@ -84,7 +91,7 @@ const drawTracking = useCallback((result) => {
   });
 
   // Draw Colored Joints
-  result.landmarks.forEach((lm, idx) => {
+  landmarksArray.forEach((lm, idx) => {
     const jointName = JOINT_MAP[idx];
     const colorKey = result.joint_colors ? result.joint_colors[jointName] : null;
     const color = COLOR_VALS[colorKey] || "#ffffff";
@@ -146,22 +153,15 @@ const drawTracking = useCallback((result) => {
       setDetectedSign(result.detected_sign || null);
       drawTracking(result); // This draws the skeleton
       
-      // Check if sign matches - use both is_correct flag AND manual sign comparison
+      // Check if sign matches instantly
       const signMatchesTarget = result.detected_sign && 
         result.detected_sign.toUpperCase() === targetSign.toUpperCase();
       
-      if (result.is_correct || (signMatchesTarget && result.confidence >= 0.35)) {
-        matchCountRef.current += 1;
-        console.log(`[MATCH] Count: ${matchCountRef.current}`);
-        // Require 2 consecutive matches for reliability
-        if (matchCountRef.current >= 2) {
+      // If it matches exactly or the backend says it's correct, trigger success immediately
+      if (result.is_correct || signMatchesTarget) {
           const finalScore = Math.max(result.overall_score || 0, result.confidence * 100 || 60);
           console.log(`[CORRECT SIGN TRIGGERED] Score: ${finalScore}`);
           onCorrectSign(finalScore);
-          matchCountRef.current = 0;
-        }
-      } else {
-        matchCountRef.current = 0;
       }
     } else {
       setScore(0);

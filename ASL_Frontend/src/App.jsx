@@ -36,12 +36,12 @@ function MainApp() {
     }
   };
 
-  const handleFinishLesson = async (success, lessonId, earnedXP = 100) => {
+  const handleFinishLesson = async (success, lessonId, earnedXP = 100, accuracy = 1.0) => {
     if (success) {
       if (currentSession) {
         try {
           const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
-          await endSession(currentSession.id, earnedXP, 1.0, duration);
+          await endSession(currentSession.id, earnedXP, accuracy, duration);
         } catch (e) {
           console.warn('Could not end backend session:', e);
         }

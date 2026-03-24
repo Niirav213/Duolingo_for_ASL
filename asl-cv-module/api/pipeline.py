@@ -142,17 +142,15 @@ class ASLPipeline:
         # ── 6. Score ──
         score_result = self.scorer.score(features, target_sign)
 
-        # If scorer returned zero (no reference files), use classifier match instead
+        # If scorer returned bad results but the classifier strongly matches, override
         sign_matches = (detected_sign.upper() == target_sign.upper()) and confidence >= 0.35
         
-        print(f"[DEBUG] Target: '{target_sign}', Detected: '{detected_sign}', Confidence: {confidence}, Sign Matches: {sign_matches}")
-        
-        if score_result.overall_score == 0.0 and sign_matches:
-            score_result.overall_score = confidence * 100
+        if sign_matches:
+            score_result.overall_score = max(score_result.overall_score, confidence * 100)
             score_result.is_correct = True
-        elif score_result.overall_score == 0.0 and detected_sign:
+        elif detected_sign and not sign_matches:
             # Hand detected but wrong sign — give partial score
-            score_result.overall_score = confidence * 30
+            score_result.overall_score = max(score_result.overall_score, confidence * 30)
             score_result.is_correct = False
 
         print(f"[DEBUG] Final Score: {score_result.overall_score}, is_correct: {score_result.is_correct}")

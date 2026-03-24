@@ -51,8 +51,21 @@ const LessonView = ({ lessonConfig, onFinish }) => {
     }
   };
 
+  // Auto-advance after 2.5 seconds so user doesn't have to use mouse while signing
+  React.useEffect(() => {
+    if (isChecking && (isCorrect || isFailed)) {
+      const timer = setTimeout(() => {
+        handleContinue();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [isChecking, isCorrect, isFailed, currentIndex]);
+
   const handleFinishReward = () => {
-    onFinish(true, lessonConfig.id, totalXP);
+    const averageAccuracy = scores.length > 0 
+      ? (scores.reduce((sum, s) => sum + s, 0) / (scores.length * 100)) 
+      : 0;
+    onFinish(true, lessonConfig.id, totalXP, averageAccuracy);
   };
 
   const handleQuit = () => {
