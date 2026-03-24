@@ -1,0 +1,62 @@
+.mascot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mascot-small {
+  font-size: 32px;
+}
+
+.mascot-medium {
+  font-size: 64px;
+}
+
+.mascot-large {
+  font-size: 120px;
+}
+
+.mascot-placeholder {
+  filter: drop-shadow(0 4px 0 rgba(0,0,0,0.1));
+  animation: bounce-slow 3s infinite ease-in-out;
+  transition: transform 0.2s;
+}
+
+.mascot-sparkle {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  font-size: 0.5em;
+  animation: twinkle 1.5s infinite alternate;
+}
+
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes twinkle {
+  0% { opacity: 0.3; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1.2); }
+}
+
+/* Specific animations for variants */
+.mascot-greeting .mascot-placeholder {
+  animation: wave 2s infinite;
+}
+
+.mascot-celebrate .mascot-placeholder {
+  animation: jump 1s infinite alternate;
+}
+
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
+}
+
+@keyframes jump {
+  0% { transform: translateY(0) scaleY(0.95); }
+  100% { transform: translateY(-15px) scaleY(1.05); }
+}

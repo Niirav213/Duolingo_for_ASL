@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap');
+
+:root {
+  /* Color Palette - Blue Theme */
+  --color-primary: #1cb0f6; /* Bright Sky Blue */
+  --color-primary-dark: #1899d6; /* Deeper Blue for 3D effect */
+  --color-primary-light: #ddf4ff;
+  --color-secondary: #84d8ff; /* Light Blue */
+  --color-navy: #3c4d5c; /* Dark text/headers */
+  --color-gray-light: #e5e5e5;
+  --color-gray-border: #cccccc; 
+  --color-white: #ffffff;
+  --color-danger: #ff4b4b; /* Red for hearts/incorrect */
+  --color-danger-dark: #ea2b2b;
+  --color-success: #58cc02; /* We might still need green for correct answers */
+  --color-success-dark: #58a700;
+  
+  --color-gem: #1cb0f6;
+  --color-heart: #ff4b4b;
+
+  --color-background: #ffffff;
+  --color-surface: #ffffff;
+  --color-text: #3c4d5c;
+  --color-text-muted: #afafaf;
+  
+  /* Layout */
+  --sidebar-width: 256px;
+  --border-radius: 16px;
+  --border-radius-sm: 12px;
+  
+  /* Font */
+  --font-family: 'Nunito', 'Segoe UI Rounded', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+ul {
+  list-style: none;
+}
+
+button {
+  font-family: var(--font-family);
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 80px; /* For mobile nav */
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .main-content {
+    margin-left: var(--sidebar-width);
+    padding-bottom: 0;
+  }
+}
