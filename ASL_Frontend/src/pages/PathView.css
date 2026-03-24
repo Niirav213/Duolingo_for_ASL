@@ -1,0 +1,115 @@
+.path-view {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.unit-container {
+  margin-bottom: 40px;
+}
+
+.unit-header {
+  padding: 24px 16px;
+  border-radius: 16px;
+  color: var(--color-white);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.unit-header h3 {
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.unit-header p {
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+.unit-guide-btn {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: var(--color-white);
+  font-weight: 800;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.unit-guide-btn:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.path-nodes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  padding: 32px 0;
+}
+
+.path-node-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.node-button {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: var(--color-white);
+  transition: transform 0.1s;
+  box-shadow: 0 8px 0 rgba(0, 0, 0, 0.15); /* Dummy 3D effect based on color */
+  border: 4px solid rgba(255, 255, 255, 0.2);
+}
+
+.node-button.completed {
+  box-shadow: 0 8px 0 var(--color-primary-dark);
+}
+
+.node-button.active {
+  box-shadow: 0 8px 0 var(--color-primary-dark);
+}
+
+.node-button.locked {
+  box-shadow: 0 8px 0 var(--color-gray-border);
+  color: var(--color-gray-border);
+}
+
+.node-button:active:not(.locked) {
+  transform: translateY(8px);
+  box-shadow: none;
+  margin-bottom: -8px;
+}
+
+/* Float Animation for Active Node Mascot */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.mascot-indicator {
+  position: absolute;
+  top: -60px;
+  left: -20px;
+  right: -20px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  animation: float 2s infinite ease-in-out;
+}

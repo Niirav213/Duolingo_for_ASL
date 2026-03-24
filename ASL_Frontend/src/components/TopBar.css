@@ -1,0 +1,63 @@
+.topbar {
+  width: 100%;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  background-color: var(--color-white);
+  position: sticky;
+  top: 0;
+  z-index: 90;
+}
+
+.topbar-items {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 600px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  font-weight: 800;
+  font-size: 16px;
+  padding: 8px 12px;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.stat-item:hover {
+  background-color: var(--color-gray-light);
+}
+
+.stat-item .icon {
+  margin-right: 8px;
+  font-size: 24px;
+}
+
+.stat-item.streak .value {
+  color: #ff9600; /* Duolingo orange flame logic */
+}
+
+.stat-item.gems .value {
+  color: var(--color-gem);
+}
+
+.stat-item.hearts .value {
+  color: var(--color-heart);
+}
+
+@media (min-width: 768px) {
+  .topbar {
+    justify-content: flex-end;
+    padding-right: 40px;
+  }
+  
+  .topbar-items {
+    width: auto;
+    gap: 24px;
+  }
+}
