@@ -116,4 +116,14 @@ clf.train_model(X_train, y_train, X_val, y_val, epochs=50)
 
 ## Contributing
 
-This module is part of a larger open-source ASL learning platform. Contributions welcome — see open issues for tasks.
+If you're contributing, please:
+
+- Open an issue describing the change or bug first
+- Create a branch named `feature/your-short-description`
+- Include tests for new features
+
+Refer to the top-level repository contributing guidelines for the project.
+
+## License & contact
+
+This module follows the licensing of the parent project. For questions or help, contact the maintainers in the main repository or open an issue.
